@@ -36,6 +36,8 @@ function FithopProvider({ children }) {
   const [selectorOpen, setSelectorOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [adminOpen, setAdminOpen] = React.useState(false);
+  const [subscriptionVersion, setSubscriptionVersion] = React.useState(0);
+  const [purchaseVersion, setPurchaseVersion] = React.useState(0);
   // dev-only preview override for the admin gate (null = use real check)
   const [forcedAdmin, setForcedAdmin] = React.useState(null);
   const [selectedFitclip, setSelectedFitclipState] = React.useState(() => {
@@ -59,11 +61,46 @@ function FithopProvider({ children }) {
   // ---- access control (ISOLATED) -------------------------------------
   // Dummy for now. Later (Codex): replace `currentUser` with the real Cafe24
   // session and keep this email comparison — nothing else needs to change.
-  const currentUser = window.RILLIZ_DATA.auth.currentUser;
+  const currentUser = window.getCurrentUser ? window.getCurrentUser() : window.RILLIZ_DATA.auth.currentUser;
+  const currentUserId = currentUser.id || currentUser.cafe24MemberId || currentUser.email;
+  const [subscription, setSubscriptionState] = React.useState(() => window.getSubscription(currentUserId));
+  const purchases = React.useMemo(() => window.getPurchases(currentUserId), [currentUserId, purchaseVersion]);
   const computeIsAdmin = (user) =>
-    !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
+    !!user && user.loggedIn && (user.isAdmin || window.RILLIZ_DATA.auth.adminEmails.includes(user.email));
   const realIsAdmin = computeIsAdmin(currentUser);
   const isAdmin = forcedAdmin === null ? realIsAdmin : forcedAdmin;
+
+  const refreshAccessCounts = () => {
+    (window.RILLIZ_DATA.fitclips || []).forEach(fc => {
+      fc.ownedCount = (fc.tracks || []).filter(canWatchTrack).length;
+      fc.availableCount = fc.ownedCount;
+    });
+  };
+  const saveMockSubscription = (next) => {
+    const saved = window.setMockSubscription(currentUserId, next);
+    setSubscriptionState(saved);
+    refreshAccessCounts();
+    setSubscriptionVersion(v => v + 1);
+    return saved;
+  };
+  const resetMockSubscription = () => {
+    const saved = window.clearMockSubscription(currentUserId);
+    setSubscriptionState(saved);
+    refreshAccessCounts();
+    setSubscriptionVersion(v => v + 1);
+    return saved;
+  };
+  const completeMockPurchase = (track) => {
+    const record = window.createMockPurchase(currentUser, track);
+    refreshAccessCounts();
+    setPurchaseVersion(v => v + 1);
+    return record;
+  };
+  const removeMockPurchaseRecord = (trackId) => {
+    window.removeMockPurchase(currentUserId, trackId);
+    refreshAccessCounts();
+    setPurchaseVersion(v => v + 1);
+  };
 
   const setSelectedFitclip = (n) => { const v = Math.min(48, Math.max(1, n)); setSelectedFitclipState(v); lsSet(LS.selectedFitclip, v); };
   const stepAlbum = (dir) => setSelectedFitclip(selectedFitclip + dir);
@@ -175,6 +212,9 @@ function FithopProvider({ children }) {
     searchOpen, setSearchOpen,
     adminOpen, setAdminOpen,
     currentUser, isAdmin, forcedAdmin, setForcedAdmin,
+    subscription, subscriptionVersion, purchaseVersion,
+    saveMockSubscription, resetMockSubscription,
+    purchases, completeMockPurchase, removeMockPurchaseRecord,
     selectedFitclip, setSelectedFitclip, stepAlbum, getFitclip, currentFitclip,
     playRequest, requestPlay,
     queue, queueIndex, queueTitle, queueSource, queueOpen, setQueueOpen,

@@ -1,6 +1,6 @@
 // FITHOP — My Account panel. Full-screen on mobile, right side panel on tablet/PC.
 // Sections: language · membership card · subscription notice · purchased videos.
-const { useState: useAccState } = React;
+const { useState: useAccState, useEffect: useAccEffect } = React;
 
 const ACC_LANGS = [
   { id: 'KR', flag: '🇰🇷' },
@@ -8,8 +8,15 @@ const ACC_LANGS = [
   { id: 'EN', flag: '🇺🇸' },
 ];
 
-function StatusBadge({ active, t }) {
-  return <span className="fh-badge" data-active={active}>{active ? t.status_active : t.status_inactive}</span>;
+function subscriptionStatusLabel(status, t) {
+  if (status === 'active') return t.status_active;
+  if (status === 'inactive') return t.status_inactive;
+  return t.membershipRequired || t.membership_required;
+}
+
+function StatusBadge({ status, t }) {
+  const active = status === 'active';
+  return <span className="fh-badge" data-active={active}>{subscriptionStatusLabel(status, t)}</span>;
 }
 
 function AccountView() {
@@ -17,12 +24,24 @@ function AccountView() {
   const t = f.t;
   const acc = window.RILLIZ_DATA.account;
 
-  const [active, setActive] = useAccState(acc.membershipActive);
-  const [method, setMethod] = useAccState(acc.paymentMethod);
+  const [mockProvider, setMockProvider] = useAccState(f.subscription.provider);
+  const [mockStatus, setMockStatus] = useAccState(f.subscription.status);
+
+  useAccEffect(() => {
+    setMockProvider(f.subscription.provider);
+    setMockStatus(f.subscription.status);
+  }, [f.subscriptionVersion]);
 
   if (!f.accountOpen) return null;
   const close = () => f.setAccountOpen(false);
   const stop = (e) => e.stopPropagation();
+  const active = f.subscription.status === 'active';
+  const method = (f.subscription.provider || 'cafe24').toUpperCase();
+  const nextBilling = f.subscription.nextBillingDate ? f.subscription.nextBillingDate.slice(0, 10) : '-';
+  const saveMockSubscription = () => {
+    f.saveMockSubscription({ provider: mockProvider, status: mockStatus });
+    f.showToast('정기결제 mock 상태가 저장되었습니다.');
+  };
 
   return (
     <div className="fh-acc-scrim" onClick={close}>
@@ -61,12 +80,12 @@ function AccountView() {
                 <span className="nm">{acc.name}</span>
                 <span className="em">{acc.email}</span>
               </div>
-              <StatusBadge active={active} t={t} />
+              <StatusBadge status={f.subscription.status} t={t} />
             </div>
             <div className="fh-mem-grid">
               <div className="fh-mem-field">
                 <span className="k">{t.membership}</span>
-                <span className="v">{active ? t.status_active : t.status_inactive}</span>
+                <span className="v">{subscriptionStatusLabel(f.subscription.status, t)}</span>
               </div>
               <div className="fh-mem-field">
                 <span className="k">{t.payment_method}</span>
@@ -74,17 +93,61 @@ function AccountView() {
               </div>
               <div className="fh-mem-field">
                 <span className="k">{t.next_billing}</span>
-                <span className="v">{acc.nextBilling}</span>
+                <span className="v">{nextBilling}</span>
               </div>
             </div>
             <div className="fh-mem-actions">
-              <button className="fh-btn solid" onClick={() => setActive(a => !a)}>
+              <button className="fh-btn solid" onClick={() => {
+                const nextStatus = f.subscription.status === 'active' ? 'inactive' : 'active';
+                f.saveMockSubscription({ provider: f.subscription.provider, status: nextStatus });
+              }}>
                 <Icon.Card size={16} />{t.manage_membership}
               </button>
-              <button className="fh-btn ghost" onClick={() => { setMethod('PAYPAL'); f.showToast(t.link_paypal); }}>
+              <button className="fh-btn ghost" onClick={() => {
+                f.saveMockSubscription({ provider: 'paypal', status: f.subscription.status });
+                f.showToast(t.link_paypal);
+              }}>
                 <Icon.Link size={16} />{t.link_paypal}
               </button>
             </div>
+          </section>
+
+          <section className="fh-card">
+            <div className="fh-sec-head">
+              <h3>정기결제 mock</h3>
+              <span className="fh-count">localStorage</span>
+            </div>
+            <div className="fh-mem-grid">
+              <label className="fh-mem-field">
+                <span className="k">provider</span>
+                <select className="fh-input" value={mockProvider} onChange={(e) => setMockProvider(e.target.value)}>
+                  <option value="cafe24">cafe24</option>
+                  <option value="paypal">paypal</option>
+                </select>
+              </label>
+              <label className="fh-mem-field">
+                <span className="k">status</span>
+                <select className="fh-input" value={mockStatus} onChange={(e) => setMockStatus(e.target.value)}>
+                  <option value="active">active</option>
+                  <option value="inactive">inactive</option>
+                  <option value="none">none</option>
+                </select>
+              </label>
+              <div className="fh-mem-field">
+                <span className="k">single purchase</span>
+                <span className="v">{mockProvider}</span>
+              </div>
+            </div>
+            <div className="fh-mem-actions">
+              <button className="fh-btn primary" onClick={saveMockSubscription}><Icon.Card size={16} />{t.save}</button>
+              <button className="fh-btn ghost" onClick={() => {
+                f.resetMockSubscription();
+                f.showToast('정기결제 mock 상태를 초기화했습니다.');
+              }}>{t.delete}</button>
+            </div>
+            <p style={{ margin: 0, font: '500 12px/1.5 var(--font-sans)', color: 'var(--fg-3)' }}>
+              테스트용 mock 상태입니다. 실제 결제 상태는 변경되지 않습니다.
+            </p>
           </section>
 
           {/* C — subscription notice */}
