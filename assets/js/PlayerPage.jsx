@@ -14,7 +14,7 @@ function FitclipSelector({ data }) {
         <span className="no">FITCLIP {data.fitclipNumber}<span className="chev"><Icon.ChevronDown size={16} /></span></span>
         <span className="mo">{data.uploadMonth}</span>
       </div>
-      <button className="pp-album-nav" aria-label={t.nextAlbum} disabled={data.fitclipNumber >= 48}
+      <button className="pp-album-nav" aria-label={t.nextAlbum} disabled={data.fitclipNumber >= f.maxFitclipNumber}
               onClick={() => f.stepAlbum(1)}><Icon.ChevronR size={20} /></button>
     </div>
   );

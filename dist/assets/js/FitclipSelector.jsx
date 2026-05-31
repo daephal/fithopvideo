@@ -21,7 +21,7 @@ function FitclipCoverArtwork({ fc, size = 'lg', selected = false }) {
 }
 
 // ---- cover-flow carousel ---------------------------------------------
-function FitclipCoverFlow({ fitclips, focus, setFocus, onApply }) {
+function FitclipCoverFlow({ fitclips, focus, setFocus, onApply, maxNumber }) {
   const startX = useFsRef(null);
   const stageRef = useFsRef(null);
   const lastWheel = useFsRef(0);
@@ -31,7 +31,7 @@ function FitclipCoverFlow({ fitclips, focus, setFocus, onApply }) {
     const x = (e.changedTouches ? e.changedTouches[0].clientX : e.clientX);
     const dx = x - startX.current; startX.current = null;
     if (Math.abs(dx) < 40) return;
-    setFocus(f => Math.min(48, Math.max(1, f + (dx < 0 ? 1 : -1))));
+    setFocus(f => Math.min(maxNumber, Math.max(1, f + (dx < 0 ? 1 : -1))));
   };
 
   // mouse-wheel navigation (throttled, carousel only, no page scroll)
@@ -44,11 +44,11 @@ function FitclipCoverFlow({ fitclips, focus, setFocus, onApply }) {
       const d = e.deltaY || e.deltaX;
       if (!d) return;
       lastWheel.current = now;
-      setFocus(f => Math.min(48, Math.max(1, f + (d > 0 ? 1 : -1))));
+      setFocus(f => Math.min(maxNumber, Math.max(1, f + (d > 0 ? 1 : -1))));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, []);
+  }, [maxNumber]);
 
   // transform presets by absolute offset
   const layout = (offset) => {
@@ -84,8 +84,8 @@ function FitclipCoverFlow({ fitclips, focus, setFocus, onApply }) {
         })}
       </div>
 
-      <button className="fs-arrow right" aria-label="next" disabled={focus >= 48}
-              onClick={() => setFocus(f => Math.min(48, f + 1))}><Icon.ChevronR size={22} /></button>
+      <button className="fs-arrow right" aria-label="next" disabled={focus >= maxNumber}
+              onClick={() => setFocus(f => Math.min(maxNumber, f + 1))}><Icon.ChevronR size={22} /></button>
     </div>
   );
 }
@@ -106,7 +106,7 @@ function FitclipAlbumCard({ fc, t, isCurrent, isFocus, onFocus, onApply }) {
   );
 }
 
-// ---- full grid (1..48) -----------------------------------------------
+// ---- full grid ---------------------------------------------------------
 function FitclipAlbumGrid({ fitclips, t, current, focus, setFocus, onApply }) {
   return (
     <div className="fs-grid">
@@ -121,12 +121,12 @@ function FitclipAlbumGrid({ fitclips, t, current, focus, setFocus, onApply }) {
 }
 
 // ---- quick search -----------------------------------------------------
-function FitclipQuickSearch({ t, onJump }) {
+function FitclipQuickSearch({ t, onJump, maxNumber }) {
   const [val, setVal] = useFsState('');
   const [err, setErr] = useFsState(false);
   const submit = () => {
     const n = parseInt(val, 10);
-    if (n >= 1 && n <= 48) { onJump(n); setErr(false); }
+    if (n >= 1 && n <= maxNumber) { onJump(n); setErr(false); }
     else setErr(true);
   };
   return (
@@ -149,6 +149,7 @@ function FitclipAlbumSelector() {
   const f = useFithop();
   const t = f.t;
   const fitclips = window.RILLIZ_DATA.fitclips;
+  const maxNumber = f.maxFitclipNumber || fitclips.reduce((max, fc) => Math.max(max, fc.fitclipNumber), 1);
 
   const [view, setView] = useFsState('flow');   // flow | grid
   const [focus, setFocus] = useFsState(f.selectedFitclip);
@@ -165,11 +166,11 @@ function FitclipAlbumSelector() {
     const onKey = (e) => {
       if (e.key === 'Escape') f.setSelectorOpen(false);
       else if (view === 'flow' && e.key === 'ArrowLeft') setFocus(n => Math.max(1, n - 1));
-      else if (view === 'flow' && e.key === 'ArrowRight') setFocus(n => Math.min(48, n + 1));
+      else if (view === 'flow' && e.key === 'ArrowRight') setFocus(n => Math.min(maxNumber, n + 1));
     };
     window.addEventListener('keydown', onKey);
     return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
-  }, [open, view]);
+  }, [open, view, maxNumber]);
 
   const close = () => f.setSelectorOpen(false);
   const apply = (n) => { f.setSelectedFitclip(n); f.setSelectorOpen(false); };
@@ -193,12 +194,12 @@ function FitclipAlbumSelector() {
           </div>
         </header>
 
-        <FitclipQuickSearch t={t} onJump={(n) => { setFocus(n); setView('flow'); }} />
+        <FitclipQuickSearch t={t} maxNumber={maxNumber} onJump={(n) => { setFocus(n); setView('flow'); }} />
 
         <div className="fs-body">
           {view === 'flow' ? (
             <React.Fragment>
-              <FitclipCoverFlow fitclips={fitclips} focus={focus} setFocus={setFocus} onApply={apply} />
+              <FitclipCoverFlow fitclips={fitclips} focus={focus} setFocus={setFocus} onApply={apply} maxNumber={maxNumber} />
               <div className="fs-focusinfo">
                 <div className="fs-focusmeta">
                   <span className="no">FITCLIP {focusFc.fitclipNumber}</span>

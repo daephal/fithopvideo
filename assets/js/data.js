@@ -1,6 +1,8 @@
 // Fake FITHOP RILLIZ catalogue.
 // Each release has a CSS gradient `cover` so we don't need image assets.
 
+window.FITHOP_ADMIN_STORAGE_KEY = 'fithop-admin-fitclips';
+
 window.RILLIZ_DATA = {
   hero: {
     id: 'magnetic',
@@ -238,36 +240,100 @@ function normalizeTrack(raw, fitclip, index) {
       availableCount: owned,
     });
   }
-  window.RILLIZ_DATA.fitclips = fitclips;
-  window.getFitclip = (num) => fitclips.find(f => f.fitclipNumber === num) || null;
+  function cloneData(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
 
-  // Normalize every track into the API-ready schema while preserving legacy
-  // keys used by the current static UI.
-  const tempoLabel = (bpm) => bpm < 100 ? 'LOW TEMPO' : (bpm <= 125 ? 'MEDIUM TEMPO' : 'HIGH TEMPO');
-  const CATS = ['WARM UP', null, 'SPECIAL CHOREO', 'COOL DOWN', null];
-  fitclips.forEach(fc => {
-    fc.tracks = (fc.tracks || []).map((tr, i) => {
-      const normalized = normalizeTrack(tr, fc, i);
-      if (!normalized.tempoLabel) normalized.tempoLabel = tempoLabel(normalized.bpm);
-      if (normalized.category === undefined) normalized.category = CATS[(fc.fitclipNumber + i) % CATS.length];
-      return normalized;
-    });
-    fc.trackCount = fc.tracks.length;
-    fc.ownedCount = fc.tracks.filter(window.canWatchTrack).length;
-    fc.availableCount = fc.ownedCount;
-    if (fc.fitclipNumber === 48) {
-      base.tracks = fc.tracks;
-      base.trackCount = fc.trackCount;
+  function readAdminFitclips() {
+    const storage = window.localStorage;
+    if (!storage) return null;
+    try {
+      const raw = storage.getItem(window.FITHOP_ADMIN_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+    } catch (e) {
+      return null;
     }
-  });
+  }
 
-  // global lookup maps (tracks + covers across every fitclip)
-  const allTracks = {}, allCovers = {};
-  fitclips.forEach(fc => {
-    (fc.tracks || []).forEach(tr => { allTracks[tr.id] = tr; allCovers[tr.id] = (fc.covers && fc.covers[tr.id]) || fc.cover; });
-  });
-  window.RILLIZ_DATA.allTracks = allTracks;
-  window.RILLIZ_DATA.allCovers = allCovers;
+  function installFitclips(rawFitclips) {
+    // Normalize every track into the API-ready schema while preserving legacy
+    // keys used by the current static UI.
+    const source = Array.isArray(rawFitclips) && rawFitclips.length > 0 ? rawFitclips : fitclips;
+    const normalizedFitclips = source.map((rawFc) => {
+      const n = Number(rawFc.fitclipNumber) || 1;
+      const fc = {
+        ...rawFc,
+        fitclipNumber: n,
+        uploadMonth: rawFc.uploadMonth || uploadMonth(n),
+        albumCoverUrl: rawFc.albumCoverUrl || '',
+        coverGradient: rawFc.coverGradient || rawFc.cover || coverGradient(n),
+        cover: rawFc.cover || rawFc.coverGradient || coverGradient(n),
+        tracks: Array.isArray(rawFc.tracks) ? rawFc.tracks : [],
+        covers: rawFc.covers ? { ...rawFc.covers } : {},
+        isPublished: rawFc.isPublished !== false,
+      };
+      fc.title = rawFc.title || rawFc.fitclip || `FITCLIP ${n}`;
+      fc.fitclip = rawFc.fitclip || fc.title;
+      fc.tracks = fc.tracks.map((tr, i) => {
+        const normalized = normalizeTrack(tr, fc, i);
+        if (!normalized.tempoLabel) normalized.tempoLabel = tempoLabel(normalized.bpm);
+        if (normalized.category === undefined) normalized.category = CATS[(fc.fitclipNumber + i) % CATS.length];
+        fc.covers[normalized.id] = fc.covers[normalized.id] || (normalized.thumbnailUrl ? `url(${normalized.thumbnailUrl})` : fc.cover);
+        return normalized;
+      });
+      fc.trackCount = fc.tracks.length;
+      fc.ownedCount = fc.tracks.filter(window.canWatchTrack).length;
+      fc.availableCount = fc.ownedCount;
+      return fc;
+    }).sort((a, b) => a.fitclipNumber - b.fitclipNumber);
+
+    const publicFitclips = normalizedFitclips.filter(fc => fc.isPublished !== false);
+    const visibleFitclips = publicFitclips.length > 0 ? publicFitclips : normalizedFitclips;
+
+    window.RILLIZ_DATA.adminFitclips = normalizedFitclips;
+    window.RILLIZ_DATA.fitclips = visibleFitclips;
+    window.getFitclip = (num) => window.RILLIZ_DATA.fitclips.find(f => f.fitclipNumber === Number(num)) || null;
+    window.getFitclipMaxNumber = () => window.RILLIZ_DATA.fitclips.reduce((max, fc) => Math.max(max, fc.fitclipNumber), 1);
+
+    const live = window.getFitclip(48) || window.RILLIZ_DATA.fitclips[window.RILLIZ_DATA.fitclips.length - 1];
+    if (live) {
+      base.fitclip = live.fitclip;
+      base.tracks = live.tracks;
+      base.covers = live.covers;
+      base.cover = live.cover;
+      base.trackCount = live.trackCount;
+    }
+
+    const allTracks = {}, allCovers = {};
+    window.RILLIZ_DATA.fitclips.forEach(fc => {
+      (fc.tracks || []).forEach(tr => {
+        allTracks[tr.id] = tr;
+        allCovers[tr.id] = (fc.covers && fc.covers[tr.id]) || fc.cover;
+      });
+    });
+    window.RILLIZ_DATA.allTracks = allTracks;
+    window.RILLIZ_DATA.allCovers = allCovers;
+    return window.RILLIZ_DATA.fitclips;
+  }
+
+  const CATS = ['WARM UP', null, 'SPECIAL CHOREO', 'COOL DOWN', null];
+  const tempoLabel = (bpm) => bpm < 100 ? 'LOW TEMPO' : (bpm <= 125 ? 'MEDIUM TEMPO' : 'HIGH TEMPO');
+  const defaultFitclips = cloneData(fitclips);
+  installFitclips(readAdminFitclips() || defaultFitclips);
+  window.FITHOP_DATA_STORE = {
+    storageKey: window.FITHOP_ADMIN_STORAGE_KEY,
+    getDefaultFitclips: () => cloneData(defaultFitclips),
+    readAdminFitclips,
+    installFitclips,
+    resetAdminFitclips: () => {
+      if (window.localStorage) {
+        try { window.localStorage.removeItem(window.FITHOP_ADMIN_STORAGE_KEY); } catch (e) {}
+      }
+      return installFitclips(defaultFitclips);
+    },
+  };
 })();
 
 window.RILLIZ_COPY = {
