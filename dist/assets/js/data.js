@@ -86,8 +86,8 @@ window.RILLIZ_DATA = {
   // Dummy auth — UI only. Real access control (Cafe24 session ↔ admin email)
   // is wired later in the store's computeIsAdmin(); see store.jsx.
   auth: {
-    currentUser: { name: '김다인', email: 'dain.kim@example.com', loggedIn: true },
-    adminEmails: ['admin@fithop.com', 'dain.kim@example.com'],
+    currentUser: { name: '대팔', email: 'daephal@gmail.com', loggedIn: true },
+    adminEmails: ['daephal@gmail.com'],
   },
 };
 

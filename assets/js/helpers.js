@@ -57,6 +57,11 @@
     return copyValue(copy, 'purchaseRequired');
   }
 
+  function isAdminUser(user) {
+    const adminEmails = (window.RILLIZ_DATA && window.RILLIZ_DATA.auth && window.RILLIZ_DATA.auth.adminEmails) || [];
+    return !!user && user.loggedIn === true && adminEmails.includes(user.email);
+  }
+
   window.FITHOP_TRACK_ACCESS = ACCESS;
   window.FITHOP_HELPERS = {
     getTrackAccessState,
@@ -64,10 +69,12 @@
     canPurchaseTrack,
     getPurchaseButtonLabel,
     getTrackStatusLabel,
+    isAdminUser,
   };
   window.getTrackAccessState = getTrackAccessState;
   window.canWatchTrack = canWatchTrack;
   window.canPurchaseTrack = canPurchaseTrack;
   window.getPurchaseButtonLabel = getPurchaseButtonLabel;
   window.getTrackStatusLabel = getTrackStatusLabel;
+  window.isAdminUser = isAdminUser;
 })();

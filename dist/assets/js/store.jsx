@@ -35,7 +35,14 @@ function FithopProvider({ children }) {
   const [playlistOpen, setPlaylistOpen] = React.useState(false);
   const [selectorOpen, setSelectorOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
-  const [adminOpen, setAdminOpen] = React.useState(false);
+  const [adminOpen, setAdminOpen] = React.useState(() => {
+    try {
+      const path = window.location.pathname.replace(/\/+$/, '');
+      return path.endsWith('/admin') || window.location.hash === '#admin';
+    } catch (e) {
+      return false;
+    }
+  });
   // dev-only preview override for the admin gate (null = use real check)
   const [forcedAdmin, setForcedAdmin] = React.useState(null);
   const [selectedFitclip, setSelectedFitclipState] = React.useState(() => {
@@ -60,9 +67,7 @@ function FithopProvider({ children }) {
   // Dummy for now. Later (Codex): replace `currentUser` with the real Cafe24
   // session and keep this email comparison — nothing else needs to change.
   const currentUser = window.RILLIZ_DATA.auth.currentUser;
-  const computeIsAdmin = (user) =>
-    !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
-  const realIsAdmin = computeIsAdmin(currentUser);
+  const realIsAdmin = isAdminUser(currentUser);
   const isAdmin = forcedAdmin === null ? realIsAdmin : forcedAdmin;
 
   const setSelectedFitclip = (n) => { const v = Math.min(48, Math.max(1, n)); setSelectedFitclipState(v); lsSet(LS.selectedFitclip, v); };
