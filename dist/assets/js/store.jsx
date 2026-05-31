@@ -30,6 +30,7 @@ function FithopProvider({ children }) {
   const [lang, setLangState] = React.useState(detectLang);
   const [playlists, setPlaylists] = React.useState(seedPlaylists);
   const [favorites, setFavorites] = React.useState(() => lsGet(LS.favorites, ['t2']));
+  const [purchaseVersion, setPurchaseVersion] = React.useState(0);
   const [toast, setToast] = React.useState(null);
   const [accountOpen, setAccountOpen] = React.useState(false);
   const [playlistOpen, setPlaylistOpen] = React.useState(false);
@@ -64,6 +65,17 @@ function FithopProvider({ children }) {
     !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
   const realIsAdmin = computeIsAdmin(currentUser);
   const isAdmin = forcedAdmin === null ? realIsAdmin : forcedAdmin;
+  const purchases = window.getPurchases(currentUser.id || currentUser.email);
+  const completeMockPurchase = (track) => {
+    const purchase = window.createMockPurchase(currentUser, track);
+    setPurchaseVersion(v => v + 1);
+    return purchase;
+  };
+  const removeMockPurchase = (trackId) => {
+    const next = window.removeMockPurchase(currentUser.id || currentUser.email, trackId);
+    setPurchaseVersion(v => v + 1);
+    return next;
+  };
 
   const setSelectedFitclip = (n) => { const v = Math.min(48, Math.max(1, n)); setSelectedFitclipState(v); lsSet(LS.selectedFitclip, v); };
   const stepAlbum = (dir) => setSelectedFitclip(selectedFitclip + dir);
@@ -175,6 +187,7 @@ function FithopProvider({ children }) {
     searchOpen, setSearchOpen,
     adminOpen, setAdminOpen,
     currentUser, isAdmin, forcedAdmin, setForcedAdmin,
+    purchases, purchaseVersion, completeMockPurchase, removeMockPurchase,
     selectedFitclip, setSelectedFitclip, stepAlbum, getFitclip, currentFitclip,
     playRequest, requestPlay,
     queue, queueIndex, queueTitle, queueSource, queueOpen, setQueueOpen,

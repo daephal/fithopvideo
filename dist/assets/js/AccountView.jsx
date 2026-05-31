@@ -19,6 +19,11 @@ function AccountView() {
 
   const [active, setActive] = useAccState(acc.membershipActive);
   const [method, setMethod] = useAccState(acc.paymentMethod);
+  const mockPurchases = (f.purchases || []).map(p => {
+    const tr = f.trackById(p.trackId);
+    return { purchase: p, track: tr, cover: tr ? f.coverById(tr.id) : null };
+  }).filter(item => item.track);
+  const purchaseCount = acc.purchased.length + mockPurchases.length;
 
   if (!f.accountOpen) return null;
   const close = () => f.setAccountOpen(false);
@@ -78,10 +83,18 @@ function AccountView() {
               </div>
             </div>
             <div className="fh-mem-actions">
-              <button className="fh-btn solid" onClick={() => setActive(a => !a)}>
+              <button className="fh-btn solid" onClick={() => setActive(a => {
+                const next = !a;
+                if (window.RILLIZ_DATA.auth.currentUser) window.RILLIZ_DATA.auth.currentUser.subscriptionStatus = next ? 'active' : 'inactive';
+                return next;
+              })}>
                 <Icon.Card size={16} />{t.manage_membership}
               </button>
-              <button className="fh-btn ghost" onClick={() => { setMethod('PAYPAL'); f.showToast(t.link_paypal); }}>
+              <button className="fh-btn ghost" onClick={() => {
+                if (window.RILLIZ_DATA.auth.currentUser) window.RILLIZ_DATA.auth.currentUser.membershipProvider = 'paypal';
+                setMethod('PAYPAL');
+                f.showToast(t.link_paypal);
+              }}>
                 <Icon.Link size={16} />{t.link_paypal}
               </button>
             </div>
@@ -98,9 +111,23 @@ function AccountView() {
           <section className="fh-sec">
             <div className="fh-sec-head">
               <h3>{t.purchased_videos}</h3>
-              <span className="fh-count">{acc.purchased.length}</span>
+              <span className="fh-count">{purchaseCount}</span>
             </div>
             <div className="fh-vid-list">
+              {mockPurchases.map(({ purchase, track, cover }) => {
+                const watchable = canWatchTrack(track);
+                const purchasedAt = new Date(purchase.purchasedAt).toLocaleDateString('ko-KR');
+                return (
+                  <button key={purchase.userId + '_' + purchase.trackId} className="fh-vid" onClick={() => { f.showToast(track.displayTitle || track.title); close(); }}>
+                    <span className="th" style={{ background: cover }} />
+                    <span className="meta">
+                      <span className="t">FITCLIP {purchase.fitclipNumber} · {track.artist} - {track.songTitle}</span>
+                      <span className="s">{purchasedAt} · {purchase.paymentProvider.toUpperCase()} · {getTrackStatusLabel(track, t)}</span>
+                    </span>
+                    <span className="st" data-ok={watchable}>{watchable ? t.watch_available : t.membership_required}</span>
+                  </button>
+                );
+              })}
               {acc.purchased.map(v => (
                 <button key={v.id} className="fh-vid" onClick={() => { f.showToast(v.title); close(); }}>
                   <span className="th" style={{ background: v.cover }} />

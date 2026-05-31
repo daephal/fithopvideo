@@ -68,7 +68,7 @@ function TrackInfo({ current, mirror, setMirror }) {
 }
 
 // ---- One track row ----------------------------------------------------
-function TrackRow({ data, track, isCurrent, playing, onSelect, onMenu }) {
+function TrackRow({ data, track, isCurrent, playing, onSelect, onMenu, onPurchase }) {
   const f = useFithop();
   const t = f.t;
   const fav = f.isFav(track.id);
@@ -94,7 +94,7 @@ function TrackRow({ data, track, isCurrent, playing, onSelect, onMenu }) {
       </div>
       <div className="pp-rowend">
         {!canWatch ? (
-          <button className="pp-buy" onClick={(e) => e.stopPropagation()}>
+          <button className="pp-buy" onClick={(e) => { e.stopPropagation(); canPurchaseTrack(track) ? onPurchase(track) : f.showToast(getTrackStatusLabel(track, t)); }}>
             <Icon.Lock size={13} />{getPurchaseButtonLabel(track, t)}
           </button>
         ) : (
@@ -112,7 +112,7 @@ function TrackRow({ data, track, isCurrent, playing, onSelect, onMenu }) {
 }
 
 // ---- Track list panel (right column) ---------------------------------
-function TrackPanel({ data, current, playing, onSelect, onMenu }) {
+function TrackPanel({ data, current, playing, onSelect, onMenu, onPurchase }) {
   const f = useFithop();
   const t = f.t;
   const ids = (data.tracks || []).map(tr => tr.id);
@@ -140,7 +140,7 @@ function TrackPanel({ data, current, playing, onSelect, onMenu }) {
         {hasTracks ? data.tracks.map(tr => (
           <TrackRow key={tr.id} data={data} track={tr}
                     isCurrent={current && tr.id === current.id} playing={playing}
-                    onSelect={onSelect} onMenu={onMenu} />
+                    onSelect={onSelect} onMenu={onMenu} onPurchase={onPurchase} />
         )) : (
           <div className="fh-pp-empty sm"><span className="ic"><Icon.Playlist size={26} /></span><p className="ti">{t.noTracks}</p></div>
         )}
@@ -155,22 +155,69 @@ function firstPlayable(tracks) {
   return tracks.find(canWatchTrack) || tracks[0];
 }
 
+function PurchaseConfirmModal({ track, onCancel, onComplete }) {
+  const f = useFithop();
+  const t = f.t;
+  if (!track) return null;
+  const provider = getPurchaseProviderForUser(f.currentUser);
+  const providerLabel = provider === 'paypal' ? 'PayPal 결제' : 'Cafe24 결제';
+  const title = [track.artist, track.songTitle].filter(Boolean).join(' - ') || (track.displayTitle || track.title);
+
+  return (
+    <div className="fh-sheet-scrim" onClick={onCancel}>
+      <div className="fh-sheet fh-buy-confirm" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="구매 확인">
+        <div className="fh-sheet-grip" />
+        <div className="fh-sheet-head">
+          <div className="fh-sheet-thumb" style={{ background: window.RILLIZ_DATA.allCovers[track.id] }} />
+          <div className="fh-sheet-titles">
+            <span className="t">{title}</span>
+            <span className="s">FITCLIP {track.fitclipNumber}</span>
+          </div>
+          <button className="fh-icon-btn" onClick={onCancel} aria-label={t.close}><Icon.Close size={18} /></button>
+        </div>
+        <div className="fh-buy-body">
+          <div className="fh-info-row"><span className="k">가격</span><span className="v">5,000원 / $3.9</span></div>
+          <div className="fh-info-row"><span className="k">결제수단</span><span className="v">{providerLabel}</span></div>
+          <p className="fh-buy-note">정기결제가 활성화되어 있어야 구매 후 시청할 수 있습니다.</p>
+          <div className="fh-buy-actions">
+            <button className="fh-btn ghost" onClick={onCancel}>{t.cancel}</button>
+            <button className="fh-btn primary" onClick={() => onComplete(track)}>mock 구매 완료</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PlayerPage() {
   const f = useFithop();
+  const t = f.t;
   const data = f.currentFitclip;
 
   const [current, setCurrent] = useState(() => firstPlayable(data.tracks));
   const [playing, setPlaying] = useState(true);
   const [mirror, setMirror] = useState(false);
   const [menuTrack, setMenuTrack] = useState(null);
+  const [purchaseTrack, setPurchaseTrack] = useState(null);
 
   const onSelect = (track) => { setCurrent(track); setPlaying(true); };
+  const completePurchase = (track) => {
+    f.completeMockPurchase(track);
+    setPurchaseTrack(null);
+    if (canWatchTrack(track)) {
+      setCurrent(track);
+      setPlaying(true);
+      f.showToast(t.watch_available);
+    } else {
+      f.showToast(getTrackStatusLabel(track, t));
+    }
+  };
 
   // when the selected FITCLIP changes, reset to its first playable track
   React.useEffect(() => {
     setCurrent(firstPlayable(data.tracks));
     setPlaying(data.tracks && data.tracks.length > 0);
-  }, [f.selectedFitclip]);
+  }, [f.selectedFitclip, f.purchaseVersion]);
 
   // dummy "play this track" requests from the playlist / queue
   React.useEffect(() => {
@@ -216,7 +263,7 @@ function PlayerPage() {
             </div>
 
             <aside className="pp-right">
-              <TrackPanel data={data} current={current} playing={playing} onSelect={onSelect} onMenu={setMenuTrack} />
+              <TrackPanel data={data} current={current} playing={playing} onSelect={onSelect} onMenu={setMenuTrack} onPurchase={setPurchaseTrack} />
             </aside>
           </div>
         </div>
@@ -226,7 +273,8 @@ function PlayerPage() {
         ) : null}
       </div>
 
-      <TrackMenu track={menuTrack} onClose={() => setMenuTrack(null)} />
+      <TrackMenu track={menuTrack} onClose={() => setMenuTrack(null)} onPurchase={(track) => { setMenuTrack(null); setPurchaseTrack(track); }} />
+      <PurchaseConfirmModal track={purchaseTrack} onCancel={() => setPurchaseTrack(null)} onComplete={completePurchase} />
       <AccountView />
       <AdminView />
       <PlaylistPanel />

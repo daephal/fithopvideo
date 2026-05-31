@@ -324,6 +324,11 @@
 .fh-menu-item.owned { color: var(--fg-3); cursor: default; }
 .fh-menu-item.owned .ic { color: var(--success); }
 
+.fh-buy-confirm { max-width: 460px; }
+.fh-buy-body { display: flex; flex-direction: column; gap: 12px; padding: 14px 4px 2px; }
+.fh-buy-note { margin: 0; color: var(--fg-3); font: 500 13px/1.5 var(--font-sans); background: var(--bg-elev-1); border-radius: var(--r-md); padding: 12px; }
+.fh-buy-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
 .fh-pl-list { display: flex; flex-direction: column; gap: 4px; padding: 12px 0 2px; max-height: 50vh; overflow-y: auto; }
 .fh-pl-item {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
