@@ -35,12 +35,16 @@ function FithopProvider({ children }) {
   const [playlistOpen, setPlaylistOpen] = React.useState(false);
   const [selectorOpen, setSelectorOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
-  const [adminOpen, setAdminOpen] = React.useState(false);
+  const [adminOpen, setAdminOpen] = React.useState(() => {
+    try { return window.location.pathname.endsWith('/admin') || window.location.hash === '#admin'; } catch (e) { return false; }
+  });
+  const [catalogVersion, setCatalogVersion] = React.useState(0);
   // dev-only preview override for the admin gate (null = use real check)
   const [forcedAdmin, setForcedAdmin] = React.useState(null);
   const [selectedFitclip, setSelectedFitclipState] = React.useState(() => {
     const n = parseInt(lsGet(LS.selectedFitclip, 48), 10);
-    return (n >= 1 && n <= 48) ? n : 48;
+    const max = window.getFitclipMaxNumber ? window.getFitclipMaxNumber() : 48;
+    return (n >= 1 && n <= max) ? n : max;
   });
   const [playRequest, setPlayRequest] = React.useState(null);
   const [queue, setQueue] = React.useState([]);        // array of track ids (full playlist order)
@@ -60,15 +64,24 @@ function FithopProvider({ children }) {
   // Dummy for now. Later (Codex): replace `currentUser` with the real Cafe24
   // session and keep this email comparison — nothing else needs to change.
   const currentUser = window.RILLIZ_DATA.auth.currentUser;
-  const computeIsAdmin = (user) =>
-    !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
+  const computeIsAdmin = (user) => {
+    if (window.isAdminUser) return window.isAdminUser(user);
+    return !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
+  };
   const realIsAdmin = computeIsAdmin(currentUser);
   const isAdmin = forcedAdmin === null ? realIsAdmin : forcedAdmin;
 
-  const setSelectedFitclip = (n) => { const v = Math.min(48, Math.max(1, n)); setSelectedFitclipState(v); lsSet(LS.selectedFitclip, v); };
+  const maxFitclipNumber = window.getFitclipMaxNumber ? window.getFitclipMaxNumber() : 48;
+  const refreshCatalog = () => setCatalogVersion(v => v + 1);
+  const setSelectedFitclip = (n) => {
+    const max = window.getFitclipMaxNumber ? window.getFitclipMaxNumber() : 48;
+    const v = Math.min(max, Math.max(1, Number(n) || max));
+    setSelectedFitclipState(v);
+    lsSet(LS.selectedFitclip, v);
+  };
   const stepAlbum = (dir) => setSelectedFitclip(selectedFitclip + dir);
   const getFitclip = (n) => window.getFitclip(n);
-  const currentFitclip = window.getFitclip(selectedFitclip) || window.getFitclip(48);
+  const currentFitclip = window.getFitclip(selectedFitclip) || window.getFitclip(maxFitclipNumber) || window.RILLIZ_DATA.fitclips[0];
 
   const showToast = (msg) => {
     setToast(msg);
@@ -175,6 +188,7 @@ function FithopProvider({ children }) {
     searchOpen, setSearchOpen,
     adminOpen, setAdminOpen,
     currentUser, isAdmin, forcedAdmin, setForcedAdmin,
+    maxFitclipNumber, catalogVersion, refreshCatalog,
     selectedFitclip, setSelectedFitclip, stepAlbum, getFitclip, currentFitclip,
     playRequest, requestPlay,
     queue, queueIndex, queueTitle, queueSource, queueOpen, setQueueOpen,
