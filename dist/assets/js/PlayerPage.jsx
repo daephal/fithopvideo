@@ -170,7 +170,7 @@ function PlayerPage() {
   React.useEffect(() => {
     setCurrent(firstPlayable(data.tracks));
     setPlaying(data.tracks && data.tracks.length > 0);
-  }, [f.selectedFitclip]);
+  }, [f.selectedFitclip, f.subscriptionVersion, f.purchaseVersion]);
 
   // dummy "play this track" requests from the playlist / queue
   React.useEffect(() => {
