@@ -89,56 +89,18 @@ window.RILLIZ_DATA = {
     currentUser: { name: '김다인', email: 'dain.kim@example.com', loggedIn: true },
     adminEmails: ['admin@fithop.com', 'dain.kim@example.com'],
   },
+
+  // Demo-only defaults used to seed local UI state on first visit.
+  demo: {
+    favoriteTrackIds: ['t2'],
+    playlists: [
+      { id: 'pl_seed_warmup', name: '나의 워밍업 루틴', trackIds: ['t1', 't2', 't3'] },
+      { id: 'pl_seed_fav',    name: '좋아하는 안무',    trackIds: ['t2', 't4'] },
+    ],
+  },
 };
 
-function splitTrackTitle(displayTitle, fallbackArtist) {
-  const parts = (displayTitle || '').split(' — ');
-  if (fallbackArtist) return { artist: fallbackArtist, songTitle: displayTitle };
-  if (parts.length > 1) return { artist: parts[0], songTitle: parts.slice(1).join(' — ') };
-  return { artist: fallbackArtist || '', songTitle: displayTitle || '' };
-}
-
-function defaultTrackVersions(track) {
-  const provider = track.videoProvider || 'placeholder';
-  const embedUrl = track.videoEmbedUrl || '';
-  return [
-    { id: 'original', label: 'Original', provider, embedUrl },
-    { id: 'mirror', label: 'Mirror', provider, embedUrl },
-  ];
-}
-
-function normalizeTrack(raw, fitclip, index) {
-  const displayTitle = raw.displayTitle || raw.title || [raw.artist, raw.songTitle].filter(Boolean).join(' — ');
-  const parsed = splitTrackTitle(displayTitle, fitclip.fitclipNumber === 48 ? 'ILLIT' : '');
-  const purchased = typeof raw.purchased === 'boolean'
-    ? raw.purchased
-    : raw.locked === undefined ? true : !raw.locked;
-  const subscriptionStatus = raw.subscriptionStatus || 'active';
-  const track = {
-    ...raw,
-    id: raw.id,
-    fitclipNumber: fitclip.fitclipNumber,
-    clipIndex: raw.clipIndex || raw.n || index + 1,
-    n: raw.n || raw.clipIndex || index + 1,
-    artist: raw.artist || parsed.artist,
-    songTitle: raw.songTitle || parsed.songTitle,
-    displayTitle,
-    title: displayTitle,
-    choreo: raw.choreo || raw.choreographer,
-    choreographer: raw.choreographer || raw.choreo,
-    videoProvider: raw.videoProvider || 'placeholder',
-    videoEmbedUrl: raw.videoEmbedUrl || '',
-    thumbnailUrl: raw.thumbnailUrl || '',
-    purchased,
-    subscriptionStatus,
-    paymentProvider: raw.paymentProvider || 'cafe24',
-  };
-
-  track.versions = raw.versions || defaultTrackVersions(track);
-  track.locked = !window.canWatchTrack(track);
-  if (!track.price && window.canPurchaseTrack(track)) track.price = '₩2,500';
-  return track;
-}
+const { normalizeTrack, getTempoLabel } = window.FITHOP_DATA_HELPERS;
 
 // =========================================================================
 // FITCLIP catalogue — 48 releases. #48 reuses the live player set above;
@@ -243,12 +205,11 @@ function normalizeTrack(raw, fitclip, index) {
 
   // Normalize every track into the API-ready schema while preserving legacy
   // keys used by the current static UI.
-  const tempoLabel = (bpm) => bpm < 100 ? 'LOW TEMPO' : (bpm <= 125 ? 'MEDIUM TEMPO' : 'HIGH TEMPO');
   const CATS = ['WARM UP', null, 'SPECIAL CHOREO', 'COOL DOWN', null];
   fitclips.forEach(fc => {
     fc.tracks = (fc.tracks || []).map((tr, i) => {
       const normalized = normalizeTrack(tr, fc, i);
-      if (!normalized.tempoLabel) normalized.tempoLabel = tempoLabel(normalized.bpm);
+      if (!normalized.tempoLabel) normalized.tempoLabel = getTempoLabel(normalized.bpm);
       if (normalized.category === undefined) normalized.category = CATS[(fc.fitclipNumber + i) % CATS.length];
       return normalized;
     });
@@ -269,45 +230,3 @@ function normalizeTrack(raw, fitclip, index) {
   window.RILLIZ_DATA.allTracks = allTracks;
   window.RILLIZ_DATA.allCovers = allCovers;
 })();
-
-window.RILLIZ_COPY = {
-  KR: {
-    hero_eyebrow: '이번 주 신곡',
-    section_featured: '주목할 안무',
-    section_drops: '이번 주의 릴리즈',
-    section_choreographers: '주목할 안무가',
-    cta_watch: '시청하기',
-    cta_save: '저장',
-    cta_learned: '학습 완료',
-    nav_rilliz: '릴리즈',
-    nav_choreographers: '안무가',
-    nav_routine: '내 루틴',
-    nav_search: '검색',
-  },
-  JP: {
-    hero_eyebrow: '今週のリリース',
-    section_featured: '注目の振付',
-    section_drops: '今週のドロップ',
-    section_choreographers: '注目の振付師',
-    cta_watch: '視聴する',
-    cta_save: '保存',
-    cta_learned: '習得済み',
-    nav_rilliz: 'リリーズ',
-    nav_choreographers: '振付師',
-    nav_routine: 'マイルーティン',
-    nav_search: '検索',
-  },
-  EN: {
-    hero_eyebrow: 'This week',
-    section_featured: 'Featured choreography',
-    section_drops: "This week's drops",
-    section_choreographers: 'Featured choreographers',
-    cta_watch: 'Watch',
-    cta_save: 'Save',
-    cta_learned: 'Mark learned',
-    nav_rilliz: 'RILLIZ',
-    nav_choreographers: 'Choreographers',
-    nav_routine: 'My routine',
-    nav_search: 'Search',
-  },
-};

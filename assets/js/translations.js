@@ -1,5 +1,47 @@
-// FITHOP — additional UI strings for account / playlists / favorites / language.
-// Merged into the existing window.RILLIZ_COPY[locale] objects so t.<key> keeps working.
+// FITHOP — UI strings for account / playlists / favorites / language.
+window.RILLIZ_COPY = {
+  KR: {
+    hero_eyebrow: '이번 주 신곡',
+    section_featured: '주목할 안무',
+    section_drops: '이번 주의 릴리즈',
+    section_choreographers: '주목할 안무가',
+    cta_watch: '시청하기',
+    cta_save: '저장',
+    cta_learned: '학습 완료',
+    nav_rilliz: '릴리즈',
+    nav_choreographers: '안무가',
+    nav_routine: '내 루틴',
+    nav_search: '검색',
+  },
+  JP: {
+    hero_eyebrow: '今週のリリース',
+    section_featured: '注目の振付',
+    section_drops: '今週のドロップ',
+    section_choreographers: '注目の振付師',
+    cta_watch: '視聴する',
+    cta_save: '保存',
+    cta_learned: '習得済み',
+    nav_rilliz: 'リリーズ',
+    nav_choreographers: '振付師',
+    nav_routine: 'マイルーティン',
+    nav_search: '検索',
+  },
+  EN: {
+    hero_eyebrow: 'This week',
+    section_featured: 'Featured choreography',
+    section_drops: "This week's drops",
+    section_choreographers: 'Featured choreographers',
+    cta_watch: 'Watch',
+    cta_save: 'Save',
+    cta_learned: 'Mark learned',
+    nav_rilliz: 'RILLIZ',
+    nav_choreographers: 'Choreographers',
+    nav_routine: 'My routine',
+    nav_search: 'Search',
+  },
+};
+
+// Additional strings are merged into window.RILLIZ_COPY[locale] so t.<key> keeps working.
 (function () {
   const EXTRA = {
     KR: {

@@ -4,32 +4,14 @@
 const FithopContext = React.createContext(null);
 
 const LS = window.FITHOP_STORAGE_KEYS;
-const { lsGet, lsSetRaw, lsSet } = window.FITHOP_STATE;
-
-function detectLang() {
-  try {
-    const saved = localStorage.getItem(LS.lang);
-    if (saved && ['KR', 'JP', 'EN'].includes(saved)) return saved;
-  } catch (e) {}
-  const n = (navigator.language || '').toLowerCase();
-  if (n.startsWith('ja')) return 'JP';
-  if (n.startsWith('en')) return 'EN';
-  return 'KR';
-}
-
-// First-visit example playlists (only used when nothing is stored yet).
-function seedPlaylists() {
-  try { if (localStorage.getItem(LS.playlists) !== null) return lsGet(LS.playlists, []); } catch (e) {}
-  return [
-    { id: 'pl_seed_warmup', name: '나의 워밍업 루틴', trackIds: ['t1', 't2', 't3'] },
-    { id: 'pl_seed_fav',    name: '좋아하는 안무',    trackIds: ['t2', 't4'] },
-  ];
-}
+const { STATE_DEFAULTS, detectLang, lsGet, lsSetRaw, lsSet, lsGetOrSeed } = window.FITHOP_STATE;
+const { computeIsAdmin } = window.FITHOP_HELPERS;
 
 function FithopProvider({ children }) {
+  const demo = window.RILLIZ_DATA.demo || {};
   const [lang, setLangState] = React.useState(detectLang);
-  const [playlists, setPlaylists] = React.useState(seedPlaylists);
-  const [favorites, setFavorites] = React.useState(() => lsGet(LS.favorites, ['t2']));
+  const [playlists, setPlaylists] = React.useState(() => lsGetOrSeed(LS.playlists, demo.playlists || []));
+  const [favorites, setFavorites] = React.useState(() => lsGet(LS.favorites, demo.favoriteTrackIds || []));
   const [toast, setToast] = React.useState(null);
   const [accountOpen, setAccountOpen] = React.useState(false);
   const [playlistOpen, setPlaylistOpen] = React.useState(false);
@@ -39,8 +21,8 @@ function FithopProvider({ children }) {
   // dev-only preview override for the admin gate (null = use real check)
   const [forcedAdmin, setForcedAdmin] = React.useState(null);
   const [selectedFitclip, setSelectedFitclipState] = React.useState(() => {
-    const n = parseInt(lsGet(LS.selectedFitclip, 48), 10);
-    return (n >= 1 && n <= 48) ? n : 48;
+    const n = parseInt(lsGet(LS.selectedFitclip, STATE_DEFAULTS.selectedFitclip), 10);
+    return (n >= 1 && n <= 48) ? n : STATE_DEFAULTS.selectedFitclip;
   });
   const [playRequest, setPlayRequest] = React.useState(null);
   const [queue, setQueue] = React.useState([]);        // array of track ids (full playlist order)
@@ -60,9 +42,7 @@ function FithopProvider({ children }) {
   // Dummy for now. Later (Codex): replace `currentUser` with the real Cafe24
   // session and keep this email comparison — nothing else needs to change.
   const currentUser = window.RILLIZ_DATA.auth.currentUser;
-  const computeIsAdmin = (user) =>
-    !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
-  const realIsAdmin = computeIsAdmin(currentUser);
+  const realIsAdmin = computeIsAdmin(currentUser, window.RILLIZ_DATA.auth.adminEmails);
   const isAdmin = forcedAdmin === null ? realIsAdmin : forcedAdmin;
 
   const setSelectedFitclip = (n) => { const v = Math.min(48, Math.max(1, n)); setSelectedFitclipState(v); lsSet(LS.selectedFitclip, v); };
