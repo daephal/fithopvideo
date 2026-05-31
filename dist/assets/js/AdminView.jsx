@@ -5,6 +5,7 @@
 function AdminView() {
   const f = useFithop();
   const t = f.t;
+  const adminUser = f.currentUser || { name: 'FITHOP', email: 'mock@local' };
   if (!f.adminOpen) return null;
   const close = () => f.setAdminOpen(false);
   const stop = (e) => e.stopPropagation();
@@ -47,10 +48,10 @@ function AdminView() {
               <div className="adm-note">{t.adminPreviewNote}</div>
 
               <div className="adm-user">
-                <div className="fh-avatar">{f.currentUser.name.slice(0, 1)}</div>
+                <div className="fh-avatar">{adminUser.name.slice(0, 1)}</div>
                 <div className="meta">
-                  <span className="nm">{f.currentUser.name}</span>
-                  <span className="em">{f.currentUser.email}</span>
+                  <span className="nm">{adminUser.name}</span>
+                  <span className="em">{adminUser.email}</span>
                 </div>
                 <span className="adm-badge">{t.roleAdmin}</span>
               </div>

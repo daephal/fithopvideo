@@ -30,6 +30,7 @@ function FithopProvider({ children }) {
   const [lang, setLangState] = React.useState(detectLang);
   const [playlists, setPlaylists] = React.useState(seedPlaylists);
   const [favorites, setFavorites] = React.useState(() => lsGet(LS.favorites, ['t2']));
+  const [currentUser, setCurrentUserState] = React.useState(() => window.getCurrentUser());
   const [toast, setToast] = React.useState(null);
   const [accountOpen, setAccountOpen] = React.useState(false);
   const [playlistOpen, setPlaylistOpen] = React.useState(false);
@@ -57,13 +58,23 @@ function FithopProvider({ children }) {
   const t = window.RILLIZ_COPY[lang] || window.RILLIZ_COPY.KR;
 
   // ---- access control (ISOLATED) -------------------------------------
-  // Dummy for now. Later (Codex): replace `currentUser` with the real Cafe24
-  // session and keep this email comparison — nothing else needs to change.
-  const currentUser = window.RILLIZ_DATA.auth.currentUser;
-  const computeIsAdmin = (user) =>
-    !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
-  const realIsAdmin = computeIsAdmin(currentUser);
+  // Dummy for now. Later: replace the helper internals with the real Cafe24
+  // session lookup while keeping this store surface unchanged.
+  const realIsAdmin = window.isAdminUser(currentUser);
   const isAdmin = forcedAdmin === null ? realIsAdmin : forcedAdmin;
+  const loggedIn = !!currentUser;
+  const subscriptionStatus = window.getSubscriptionStatus(currentUser);
+  const subscriptionActive = window.isSubscriptionActive(currentUser);
+  const setCurrentUser = (user) => setCurrentUserState(window.setCurrentUser(user));
+  const clearCurrentUser = () => setCurrentUserState(window.clearCurrentUser());
+  const loginWithCafe24 = () => window.loginWithCafe24().then(user => {
+    setCurrentUserState(user);
+    return user;
+  });
+  const logoutCafe24 = () => window.logoutCafe24().then(result => {
+    setCurrentUserState(window.getCurrentUser());
+    return result;
+  });
 
   const setSelectedFitclip = (n) => { const v = Math.min(48, Math.max(1, n)); setSelectedFitclipState(v); lsSet(LS.selectedFitclip, v); };
   const stepAlbum = (dir) => setSelectedFitclip(selectedFitclip + dir);
@@ -174,7 +185,13 @@ function FithopProvider({ children }) {
     selectorOpen, setSelectorOpen,
     searchOpen, setSearchOpen,
     adminOpen, setAdminOpen,
-    currentUser, isAdmin, forcedAdmin, setForcedAdmin,
+    currentUser, setCurrentUser, clearCurrentUser,
+    isLoggedIn: loggedIn, isAdmin, forcedAdmin, setForcedAdmin,
+    subscriptionStatus, subscriptionActive,
+    getMembershipProvider: window.getMembershipProvider,
+    getSubscriptionStatus: window.getSubscriptionStatus,
+    isSubscriptionActive: window.isSubscriptionActive,
+    loginWithCafe24, logoutCafe24,
     selectedFitclip, setSelectedFitclip, stepAlbum, getFitclip, currentFitclip,
     playRequest, requestPlay,
     queue, queueIndex, queueTitle, queueSource, queueOpen, setQueueOpen,
