@@ -2,7 +2,7 @@
 // Mobile: bottom sheet. Tablet+PC: centered panel (see .fh-sheet CSS).
 const { useState: useTMState, useEffect: useTMEffect } = React;
 
-function TrackMenu({ track, onClose }) {
+function TrackMenu({ track, onClose, onPurchase }) {
   const f = useFithop();
   const t = f.t;
   const [view, setView] = useTMState('main');     // main | playlists | info
@@ -60,7 +60,11 @@ function TrackMenu({ track, onClose }) {
               <span className="lb">{t.track_info}</span>
             </button>
             {locked ? (
-              <button className="fh-menu-item buy" onClick={() => { f.showToast(getPurchaseButtonLabel(track, t)); onClose(); }}>
+              <button className="fh-menu-item buy" onClick={() => {
+                if (canPurchaseTrack(track) && onPurchase) onPurchase(track);
+                else f.showToast(getPurchaseButtonLabel(track, t));
+                onClose();
+              }}>
                 <span className="ic"><Icon.Lock size={18} /></span>
                 <span className="lb">{getPurchaseButtonLabel(track, t)}</span>
                 {canPurchaseTrack(track) ? <span className="price">{track.price || '₩2,500'}</span> : null}

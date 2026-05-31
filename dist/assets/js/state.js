@@ -5,6 +5,9 @@
     playlists: 'fithop-playlists',
     favorites: 'fithop-favorites',
     selectedFitclip: 'fithop-selected-fitclip',
+    currentUser: 'fithop-current-user',
+    purchases: 'fithop-purchases',
+    subscription: 'fithop-subscription',
   });
 
   function lsGet(key, fallback) {
