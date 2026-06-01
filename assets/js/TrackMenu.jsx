@@ -2,7 +2,7 @@
 // Mobile: bottom sheet. Tablet+PC: centered panel (see .fh-sheet CSS).
 const { useState: useTMState, useEffect: useTMEffect } = React;
 
-function TrackMenu({ track, onClose }) {
+function TrackMenu({ track, onClose, onPurchase }) {
   const f = useFithop();
   const t = f.t;
   const [view, setView] = useTMState('main');     // main | playlists | info
@@ -13,7 +13,7 @@ function TrackMenu({ track, onClose }) {
   if (!track) return null;
 
   const cover = window.RILLIZ_DATA.allCovers[track.id];
-  const locked = track.locked;
+  const locked = !canWatchTrack(track);
   const fav = f.isFav(track.id);
 
   const onFav = () => { f.toggleFav(track.id); f.showToast(fav ? t.remove_favorite : t.add_favorite); onClose(); };
@@ -21,7 +21,7 @@ function TrackMenu({ track, onClose }) {
   const onCreate = () => { const n = name.trim(); if (!n) return; const pl = f.createPlaylist(n); f.addToPlaylist(pl.id, track.id); f.showToast(t.added_to_playlist); onClose(); };
 
   const info = [
-    [t.choreographer, track.choreographer],
+    [t.choreographer, track.choreo || track.choreographer],
     [t.bpm, track.bpm],
     [t.duration, track.duration],
     [t.difficulty, '#' + track.difficulty],
@@ -34,14 +34,14 @@ function TrackMenu({ track, onClose }) {
 
         <div className="fh-sheet-head">
           {view !== 'main'
-            ? <button className="fh-icon-btn" onClick={() => setView('main')} aria-label="Back"><Icon.Back size={20} /></button>
+            ? <button className="fh-icon-btn" onClick={() => setView('main')} aria-label={t.cancel}><Icon.Back size={20} /></button>
             : null}
           <div className="fh-sheet-thumb" style={{ background: cover }} />
           <div className="fh-sheet-titles">
-            <span className="t">{track.title}</span>
-            <span className="s">{track.choreographer} · {track.duration}</span>
+            <span className="t">{track.displayTitle || track.title}</span>
+            <span className="s">{track.choreo || track.choreographer} · {track.duration}</span>
           </div>
-          <button className="fh-icon-btn" onClick={onClose} aria-label="Close"><Icon.Close size={18} /></button>
+          <button className="fh-icon-btn" onClick={onClose} aria-label={t.close}><Icon.Close size={18} /></button>
         </div>
 
         {view === 'main' ? (
@@ -60,10 +60,14 @@ function TrackMenu({ track, onClose }) {
               <span className="lb">{t.track_info}</span>
             </button>
             {locked ? (
-              <button className="fh-menu-item buy" onClick={() => { f.showToast(t.buy_now); onClose(); }}>
+              <button className="fh-menu-item buy" onClick={() => {
+                if (canPurchaseTrack(track) && onPurchase) onPurchase(track);
+                else f.showToast(getPurchaseButtonLabel(track, t));
+                onClose();
+              }}>
                 <span className="ic"><Icon.Lock size={18} /></span>
-                <span className="lb">{t.buy_now}</span>
-                <span className="price">{track.price || '₩2,500'}</span>
+                <span className="lb">{getPurchaseButtonLabel(track, t)}</span>
+                {canPurchaseTrack(track) ? <span className="price">{track.price || '₩2,500'}</span> : null}
               </button>
             ) : (
               <div className="fh-menu-item owned" aria-disabled="true">

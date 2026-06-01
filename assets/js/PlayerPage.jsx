@@ -14,7 +14,7 @@ function FitclipSelector({ data }) {
         <span className="no">FITCLIP {data.fitclipNumber}<span className="chev"><Icon.ChevronDown size={16} /></span></span>
         <span className="mo">{data.uploadMonth}</span>
       </div>
-      <button className="pp-album-nav" aria-label={t.nextAlbum} disabled={data.fitclipNumber >= 48}
+      <button className="pp-album-nav" aria-label={t.nextAlbum} disabled={data.fitclipNumber >= f.maxFitclipNumber}
               onClick={() => f.stepAlbum(1)}><Icon.ChevronR size={20} /></button>
     </div>
   );
@@ -43,8 +43,8 @@ function TrackInfo({ current, mirror, setMirror }) {
   return (
     <React.Fragment>
       <div className="pp-trackinfo">
-        <h1>{current.title}</h1>
-        <div className="credit">Choreography by <strong style={{ color: 'var(--fg-1)', fontWeight: 600 }}>{current.choreographer}</strong></div>
+        <h1>{current.displayTitle || current.title}</h1>
+        <div className="credit">Choreography by <strong style={{ color: 'var(--fg-1)', fontWeight: 600 }}>{current.choreo || current.choreographer}</strong></div>
         <div className="meta">
           <span>{current.bpm} BPM</span><span className="dot">·</span>
           <span>{current.duration}</span><span className="dot">·</span>
@@ -68,33 +68,34 @@ function TrackInfo({ current, mirror, setMirror }) {
 }
 
 // ---- One track row ----------------------------------------------------
-function TrackRow({ data, track, isCurrent, playing, onSelect, onMenu }) {
+function TrackRow({ data, track, isCurrent, playing, onSelect, onMenu, onPurchase }) {
   const f = useFithop();
   const t = f.t;
   const fav = f.isFav(track.id);
+  const canWatch = canWatchTrack(track);
   return (
-    <div className="pp-row" data-current={isCurrent} data-locked={track.locked}
-         onClick={() => !track.locked && onSelect(track)}>
+    <div className="pp-row" data-current={isCurrent} data-locked={!canWatch}
+         onClick={() => canWatch && onSelect(track)}>
       <div className="idx">
         {isCurrent && playing
           ? <span className="pp-eq" aria-label="playing"><i /><i /><i /></span>
           : track.n}
       </div>
       <div className="pp-thumb" style={{ background: data.covers[track.id] }}>
-        {track.locked ? (
+        {!canWatch ? (
           <span className="lock"><Icon.Lock size={16} /></span>
         ) : null}
       </div>
       <div className="pp-rowtext">
-        <span className="t">{track.title}</span>
+        <span className="t">{track.displayTitle || track.title}</span>
         <span className="s">
-          <span>{track.choreographer}</span><span className="dot">·</span><span>{track.duration}</span>
+          <span>{track.choreo || track.choreographer}</span><span className="dot">·</span><span>{track.duration}</span>
         </span>
       </div>
       <div className="pp-rowend">
-        {track.locked ? (
-          <button className="pp-buy" onClick={(e) => e.stopPropagation()}>
-            <Icon.Lock size={13} />{t.buy}
+        {!canWatch ? (
+          <button className="pp-buy" onClick={(e) => { e.stopPropagation(); canPurchaseTrack(track) ? onPurchase(track) : f.showToast(getTrackStatusLabel(track, t)); }}>
+            <Icon.Lock size={13} />{getPurchaseButtonLabel(track, t)}
           </button>
         ) : (
           <span className="pp-dur">{track.duration}</span>
@@ -111,7 +112,7 @@ function TrackRow({ data, track, isCurrent, playing, onSelect, onMenu }) {
 }
 
 // ---- Track list panel (right column) ---------------------------------
-function TrackPanel({ data, current, playing, onSelect, onMenu }) {
+function TrackPanel({ data, current, playing, onSelect, onMenu, onPurchase }) {
   const f = useFithop();
   const t = f.t;
   const ids = (data.tracks || []).map(tr => tr.id);
@@ -139,7 +140,7 @@ function TrackPanel({ data, current, playing, onSelect, onMenu }) {
         {hasTracks ? data.tracks.map(tr => (
           <TrackRow key={tr.id} data={data} track={tr}
                     isCurrent={current && tr.id === current.id} playing={playing}
-                    onSelect={onSelect} onMenu={onMenu} />
+                    onSelect={onSelect} onMenu={onMenu} onPurchase={onPurchase} />
         )) : (
           <div className="fh-pp-empty sm"><span className="ic"><Icon.Playlist size={26} /></span><p className="ti">{t.noTracks}</p></div>
         )}
@@ -151,25 +152,72 @@ function TrackPanel({ data, current, playing, onSelect, onMenu }) {
 // ---- Page -------------------------------------------------------------
 function firstPlayable(tracks) {
   if (!tracks || tracks.length === 0) return null;
-  return tracks.find(t => !t.locked) || tracks[0];
+  return tracks.find(canWatchTrack) || tracks[0];
+}
+
+function PurchaseConfirmModal({ track, onCancel, onComplete }) {
+  const f = useFithop();
+  const t = f.t;
+  if (!track) return null;
+  const provider = getPurchaseProviderForUser(f.currentUser);
+  const providerLabelText = provider === 'paypal' ? t.providerPayPal : t.providerCafe24;
+  const title = [track.artist, track.songTitle].filter(Boolean).join(' - ') || (track.displayTitle || track.title);
+
+  return (
+    <div className="fh-sheet-scrim" onClick={onCancel}>
+      <div className="fh-sheet fh-buy-confirm" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={t.purchaseConfirmTitle}>
+        <div className="fh-sheet-grip" />
+        <div className="fh-sheet-head">
+          <div className="fh-sheet-thumb" style={{ background: window.RILLIZ_DATA.allCovers[track.id] }} />
+          <div className="fh-sheet-titles">
+            <span className="t">{title}</span>
+            <span className="s">FITCLIP {track.fitclipNumber}</span>
+          </div>
+          <button className="fh-icon-btn" onClick={onCancel} aria-label={t.close}><Icon.Close size={18} /></button>
+        </div>
+        <div className="fh-buy-body">
+          <div className="fh-info-row"><span className="k">{t.purchasePrice}</span><span className="v">5,000원 / $3.9</span></div>
+          <div className="fh-info-row"><span className="k">{t.payment_method}</span><span className="v">{providerLabelText}</span></div>
+          <p className="fh-buy-note">{t.purchaseMembershipNotice}</p>
+          <div className="fh-buy-actions">
+            <button className="fh-btn ghost" onClick={onCancel}>{t.cancel}</button>
+            <button className="fh-btn primary" onClick={() => onComplete(track)}>{t.mockPurchaseComplete}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PlayerPage() {
   const f = useFithop();
+  const t = f.t;
   const data = f.currentFitclip;
 
   const [current, setCurrent] = useState(() => firstPlayable(data.tracks));
   const [playing, setPlaying] = useState(true);
   const [mirror, setMirror] = useState(false);
   const [menuTrack, setMenuTrack] = useState(null);
+  const [purchaseTrack, setPurchaseTrack] = useState(null);
 
   const onSelect = (track) => { setCurrent(track); setPlaying(true); };
+  const completePurchase = (track) => {
+    f.completeMockPurchase(track);
+    setPurchaseTrack(null);
+    if (canWatchTrack(track)) {
+      setCurrent(track);
+      setPlaying(true);
+      f.showToast(t.watch_available);
+    } else {
+      f.showToast(getTrackStatusLabel(track, t));
+    }
+  };
 
   // when the selected FITCLIP changes, reset to its first playable track
   React.useEffect(() => {
     setCurrent(firstPlayable(data.tracks));
     setPlaying(data.tracks && data.tracks.length > 0);
-  }, [f.selectedFitclip]);
+  }, [f.selectedFitclip, f.catalogVersion, f.subscriptionVersion, f.purchaseVersion]);
 
   // dummy "play this track" requests from the playlist / queue
   React.useEffect(() => {
@@ -185,8 +233,8 @@ function PlayerPage() {
   }, [f.playRequest]);
 
   const miniRelease = current ? {
-    title: current.title,
-    choreographer: current.choreographer,
+    title: current.displayTitle || current.title,
+    choreographer: current.choreo || current.choreographer,
     duration: current.duration,
     cover: f.coverById(current.id) || data.cover,
   } : null;
@@ -215,7 +263,7 @@ function PlayerPage() {
             </div>
 
             <aside className="pp-right">
-              <TrackPanel data={data} current={current} playing={playing} onSelect={onSelect} onMenu={setMenuTrack} />
+              <TrackPanel data={data} current={current} playing={playing} onSelect={onSelect} onMenu={setMenuTrack} onPurchase={setPurchaseTrack} />
             </aside>
           </div>
         </div>
@@ -225,7 +273,8 @@ function PlayerPage() {
         ) : null}
       </div>
 
-      <TrackMenu track={menuTrack} onClose={() => setMenuTrack(null)} />
+      <TrackMenu track={menuTrack} onClose={() => setMenuTrack(null)} onPurchase={(track) => { setMenuTrack(null); setPurchaseTrack(track); }} />
+      <PurchaseConfirmModal track={purchaseTrack} onCancel={() => setPurchaseTrack(null)} onComplete={completePurchase} />
       <AccountView />
       <AdminView />
       <PlaylistPanel />
