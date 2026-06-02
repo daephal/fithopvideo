@@ -86,9 +86,9 @@ function PlaylistPanel() {
   };
 
   const playTrack = (tr) => {
-    if (tr.locked) { f.showToast(t.purchase_required); return; }
+    if (!canWatchTrack(tr)) { f.showToast(getTrackStatusLabel(tr, t)); return; }
     f.requestPlay(tr.id);
-    f.showToast(tr.title);
+    f.showToast(tr.displayTitle || tr.title);
     if (window.matchMedia('(max-width: 767px)').matches) close();
   };
 
@@ -146,8 +146,9 @@ function PlaylistPanel() {
             </div>
           ) : tracks.map((tr, i) => {
             const isCur = f.queueSource === detail.id && f.queue[f.queueIndex] === tr.id;
+            const canWatch = canWatchTrack(tr);
             return (
-              <div key={tr.id} className="fh-pp-track draggable" data-locked={tr.locked}
+              <div key={tr.id} className="fh-pp-track draggable" data-locked={!canWatch}
                    data-cur={isCur} data-drag={dragIdx === i} data-over={overIdx === i}
                    draggable
                    onDragStart={(e) => { setDragIdx(i); e.dataTransfer.effectAllowed = 'move'; }}
@@ -157,15 +158,15 @@ function PlaylistPanel() {
                 <span className="grip" aria-hidden="true"><Icon.Grip size={18} /></span>
                 <button className="play" onClick={() => playList(detail.trackIds, detail.name, detail.id, i)}>
                   <span className="th" style={{ background: window.RILLIZ_DATA.allCovers[tr.id] }}>
-                    {tr.locked ? <span className="lk"><Icon.Lock size={14} /></span>
+                    {!canWatch ? <span className="lk"><Icon.Lock size={14} /></span>
                       : isCur ? <span className="eqbadge"><i /><i /><i /></span> : null}
                   </span>
                   <span className="tx">
-                    <span className="t">{tr.choreographer} — {tr.title}</span>
+                    <span className="t">{tr.choreo || tr.choreographer} — {tr.displayTitle || tr.title}</span>
                     <TrackMeta tr={tr} />
                   </span>
                 </button>
-                {tr.locked ? <span className="needbuy">{t.purchase_required}</span> : null}
+                {!canWatch ? <span className="needbuy">{getTrackStatusLabel(tr, t)}</span> : null}
                 <button className="fh-icon-btn sm" onClick={() => f.removeFromPlaylist(detail.id, tr.id)} aria-label={t.remove}><Icon.Close size={16} /></button>
               </div>
             );
@@ -222,7 +223,7 @@ function PlaylistPanel() {
                       <span className="info">
                         <span className="nm">{pl.name}</span>
                         <span className="ct">{pl.trackIds.length} {t.tracks_suffix === '곡' ? '트랙' : 'TRACKS'}</span>
-                        {last ? <span className="recent">{t.recently_added}: {last.choreographer} — {last.title}</span> : null}
+                        {last ? <span className="recent">{t.recently_added}: {last.choreo || last.choreographer} — {last.displayTitle || last.title}</span> : null}
                       </span>
                     </button>
                     <div className="tools">
@@ -241,22 +242,24 @@ function PlaylistPanel() {
                   <p className="ti">{t.no_favorites}</p>
                   <p className="su">{t.pl_empty_sub}</p>
                 </div>
-              ) : favTracks.map((tr, i) => (
-                <div key={tr.id} className="fh-pp-track" data-locked={tr.locked}
+              ) : favTracks.map((tr, i) => {
+                const canWatch = canWatchTrack(tr);
+                return (
+                <div key={tr.id} className="fh-pp-track" data-locked={!canWatch}
                      data-cur={f.queueSource === null && f.queueTitle === t.favorites && f.queue[f.queueIndex] === tr.id}>
                   <button className="play" onClick={() => playList(favTracks.map(x => x.id), t.favorites, null, i)}>
                     <span className="th" style={{ background: window.RILLIZ_DATA.allCovers[tr.id] }}>
-                      {tr.locked ? <span className="lk"><Icon.Lock size={14} /></span> : null}
+                      {!canWatch ? <span className="lk"><Icon.Lock size={14} /></span> : null}
                     </span>
                     <span className="tx">
-                      <span className="t">{tr.choreographer} — {tr.title}</span>
+                      <span className="t">{tr.choreo || tr.choreographer} — {tr.displayTitle || tr.title}</span>
                       <TrackMeta tr={tr} />
                     </span>
                   </button>
-                  {tr.locked ? <span className="needbuy">{t.purchase_required}</span> : null}
+                  {!canWatch ? <span className="needbuy">{getTrackStatusLabel(tr, t)}</span> : null}
                   <button className="fh-icon-btn sm fav" onClick={() => f.toggleFav(tr.id)} aria-label={t.remove_favorite}><Icon.HeartFill size={16} /></button>
                 </div>
-              ))}
+              );})}
             </React.Fragment>
           )}
         </div>

@@ -3,18 +3,8 @@
 
 const FithopContext = React.createContext(null);
 
-const LS = {
-  lang: 'fithop-language',
-  playlists: 'fithop-playlists',
-  favorites: 'fithop-favorites',
-};
-
-function lsGet(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
-  catch (e) { return fallback; }
-}
-function lsSetRaw(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
-function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+const LS = window.FITHOP_STORAGE_KEYS;
+const { lsGet, lsSetRaw, lsSet } = window.FITHOP_STATE;
 
 function detectLang() {
   try {
@@ -45,12 +35,18 @@ function FithopProvider({ children }) {
   const [playlistOpen, setPlaylistOpen] = React.useState(false);
   const [selectorOpen, setSelectorOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
-  const [adminOpen, setAdminOpen] = React.useState(false);
+  const [adminOpen, setAdminOpen] = React.useState(() => {
+    try { return window.location.pathname.endsWith('/admin') || window.location.hash === '#admin'; } catch (e) { return false; }
+  });
+  const [catalogVersion, setCatalogVersion] = React.useState(0);
+  const [subscriptionVersion, setSubscriptionVersion] = React.useState(0);
+  const [purchaseVersion, setPurchaseVersion] = React.useState(0);
   // dev-only preview override for the admin gate (null = use real check)
   const [forcedAdmin, setForcedAdmin] = React.useState(null);
   const [selectedFitclip, setSelectedFitclipState] = React.useState(() => {
-    const n = parseInt(lsGet('fithop-selected-fitclip', 48), 10);
-    return (n >= 1 && n <= 48) ? n : 48;
+    const n = parseInt(lsGet(LS.selectedFitclip, 48), 10);
+    const max = window.getFitclipMaxNumber ? window.getFitclipMaxNumber() : 48;
+    return (n >= 1 && n <= max) ? n : max;
   });
   const [playRequest, setPlayRequest] = React.useState(null);
   const [queue, setQueue] = React.useState([]);        // array of track ids (full playlist order)
@@ -69,16 +65,85 @@ function FithopProvider({ children }) {
   // ---- access control (ISOLATED) -------------------------------------
   // Dummy for now. Later (Codex): replace `currentUser` with the real Cafe24
   // session and keep this email comparison — nothing else needs to change.
-  const currentUser = window.RILLIZ_DATA.auth.currentUser;
-  const computeIsAdmin = (user) =>
-    !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
+  const [currentUser, setCurrentUserState] = React.useState(() => window.getCurrentUser());
+  const currentUserId = currentUser.id || currentUser.cafe24MemberId || currentUser.email;
+  const [subscription, setSubscriptionState] = React.useState(() => window.getSubscription(currentUserId));
+  const purchases = React.useMemo(
+    () => currentUser.loggedIn ? window.getPurchases(currentUserId) : [],
+    [currentUserId, currentUser.loggedIn, purchaseVersion]
+  );
+  const computeIsAdmin = (user) => {
+    if (window.isAdminUser) return window.isAdminUser(user);
+    return !!user && user.loggedIn && window.RILLIZ_DATA.auth.adminEmails.includes(user.email);
+  };
   const realIsAdmin = computeIsAdmin(currentUser);
   const isAdmin = forcedAdmin === null ? realIsAdmin : forcedAdmin;
 
-  const setSelectedFitclip = (n) => { const v = Math.min(48, Math.max(1, n)); setSelectedFitclipState(v); lsSet('fithop-selected-fitclip', v); };
+  const maxFitclipNumber = window.getFitclipMaxNumber ? window.getFitclipMaxNumber() : 48;
+  const refreshAccessCounts = () => {
+    (window.RILLIZ_DATA.fitclips || []).forEach(fc => {
+      fc.ownedCount = (fc.tracks || []).filter(canWatchTrack).length;
+      fc.availableCount = fc.ownedCount;
+    });
+  };
+  const refreshSessionState = (user) => {
+    const nextUser = user || window.getCurrentUser();
+    const nextUserId = nextUser.id || nextUser.cafe24MemberId || nextUser.email;
+    setCurrentUserState(nextUser);
+    setSubscriptionState(window.getSubscription(nextUserId));
+    refreshAccessCounts();
+    setSubscriptionVersion(v => v + 1);
+  };
+  const mockLogin = () => {
+    const nextUser = window.resetCurrentUser();
+    refreshSessionState(nextUser);
+    return nextUser;
+  };
+  const mockLogout = () => {
+    const nextUser = window.clearCurrentUser();
+    refreshSessionState(nextUser);
+    return nextUser;
+  };
+  const saveMockSubscription = (next) => {
+    const saved = window.setMockSubscription(currentUserId, next);
+    setSubscriptionState(saved);
+    setCurrentUserState(window.getCurrentUser());
+    refreshAccessCounts();
+    setSubscriptionVersion(v => v + 1);
+    return saved;
+  };
+  const resetMockSubscription = () => {
+    const saved = window.clearMockSubscription(currentUserId);
+    setSubscriptionState(saved);
+    setCurrentUserState(window.getCurrentUser());
+    refreshAccessCounts();
+    setSubscriptionVersion(v => v + 1);
+    return saved;
+  };
+  const completeMockPurchase = (track) => {
+    const record = window.createMockPurchase(currentUser, track);
+    refreshAccessCounts();
+    setPurchaseVersion(v => v + 1);
+    return record;
+  };
+  const removeMockPurchaseRecord = (trackId) => {
+    window.removeMockPurchase(currentUserId, trackId);
+    refreshAccessCounts();
+    setPurchaseVersion(v => v + 1);
+  };
+  const refreshCatalog = () => {
+    refreshAccessCounts();
+    setCatalogVersion(v => v + 1);
+  };
+  const setSelectedFitclip = (n) => {
+    const max = window.getFitclipMaxNumber ? window.getFitclipMaxNumber() : 48;
+    const v = Math.min(max, Math.max(1, Number(n) || max));
+    setSelectedFitclipState(v);
+    lsSet(LS.selectedFitclip, v);
+  };
   const stepAlbum = (dir) => setSelectedFitclip(selectedFitclip + dir);
   const getFitclip = (n) => window.getFitclip(n);
-  const currentFitclip = window.getFitclip(selectedFitclip) || window.getFitclip(48);
+  const currentFitclip = window.getFitclip(selectedFitclip) || window.getFitclip(maxFitclipNumber) || window.RILLIZ_DATA.fitclips[0];
 
   const showToast = (msg) => {
     setToast(msg);
@@ -146,21 +211,21 @@ function FithopProvider({ children }) {
 
   // ---- play queue ----
   const firstPlayable = (ids, from) => {
-    for (let i = Math.max(0, from); i < ids.length; i++) { const tr = trackById(ids[i]); if (tr && !tr.locked) return i; }
-    for (let i = 0; i < ids.length; i++) { const tr = trackById(ids[i]); if (tr && !tr.locked) return i; }
+    for (let i = Math.max(0, from); i < ids.length; i++) { const tr = trackById(ids[i]); if (tr && canWatchTrack(tr)) return i; }
+    for (let i = 0; i < ids.length; i++) { const tr = trackById(ids[i]); if (tr && canWatchTrack(tr)) return i; }
     return -1;
   };
   const playQueue = (trackIds, title, source, startIndex = 0) => {
     const ids = trackIds.filter(id => trackById(id));
     setQueue(ids); setQueueTitle(title || ''); setQueueSource(source || null);
     const i = firstPlayable(ids, startIndex);
-    if (i < 0) { showToast(t.purchase_required); return; }
+    if (i < 0) { showToast(getTrackStatusLabel(ids.map(trackById).find(Boolean), t)); return; }
     setQueueIndex(i); requestPlay(ids[i]);
   };
   const playAt = (i) => {
     const id = queue[i]; const tr = trackById(id);
     if (!tr) return;
-    if (tr.locked) { showToast(t.purchase_required); return; }
+    if (!canWatchTrack(tr)) { showToast(getTrackStatusLabel(tr, t)); return; }
     setQueueIndex(i); requestPlay(id);
   };
   const queueStep = (dir) => {
@@ -170,7 +235,7 @@ function FithopProvider({ children }) {
       i += dir;
       if (i < 0 || i >= queue.length) return;
       const tr = trackById(queue[i]);
-      if (tr && !tr.locked) { setQueueIndex(i); requestPlay(queue[i]); return; }
+      if (tr && canWatchTrack(tr)) { setQueueIndex(i); requestPlay(queue[i]); return; }
     }
   };
 
@@ -185,6 +250,10 @@ function FithopProvider({ children }) {
     searchOpen, setSearchOpen,
     adminOpen, setAdminOpen,
     currentUser, isAdmin, forcedAdmin, setForcedAdmin,
+    maxFitclipNumber, catalogVersion, refreshCatalog,
+    currentUserId, subscription, subscriptionVersion, purchaseVersion,
+    mockLogin, mockLogout, saveMockSubscription, resetMockSubscription,
+    purchases, completeMockPurchase, removeMockPurchaseRecord,
     selectedFitclip, setSelectedFitclip, stepAlbum, getFitclip, currentFitclip,
     playRequest, requestPlay,
     queue, queueIndex, queueTitle, queueSource, queueOpen, setQueueOpen,

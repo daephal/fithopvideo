@@ -43,7 +43,7 @@ function SongSearch() {
         }
         // text match
         if (text) {
-          const hay = `${tr.title} ${tr.choreographer} ${tr.bpm} ${tr.category || ''} ${tr.tempoLabel} fitclip ${fc.fitclipNumber}`.toLowerCase();
+          const hay = `${tr.displayTitle || tr.title} ${tr.artist || ''} ${tr.songTitle || ''} ${tr.choreo || tr.choreographer} ${tr.bpm} ${tr.category || ''} ${tr.tempoLabel} fitclip ${fc.fitclipNumber}`.toLowerCase();
           if (!hay.includes(text)) return;
         }
         out.push({ tr, fc });
@@ -57,7 +57,7 @@ function SongSearch() {
 
   const pick = ({ tr, fc }) => {
     f.setSelectedFitclip(fc.fitclipNumber);
-    if (tr.locked) { f.showToast(t.purchaseRequired); }
+    if (!canWatchTrack(tr)) { f.showToast(getTrackStatusLabel(tr, t)); }
     else { f.requestPlay(tr.id); }
     close();
   };
@@ -91,21 +91,21 @@ function SongSearch() {
           {results.length === 0 ? (
             <p className="fh-empty">{t.noSearchResults}</p>
           ) : results.map(({ tr, fc }) => (
-            <button key={fc.fitclipNumber + '_' + tr.id} className="ss-row" data-locked={tr.locked} onClick={() => pick({ tr, fc })}>
+            <button key={fc.fitclipNumber + '_' + tr.id} className="ss-row" data-locked={!canWatchTrack(tr)} onClick={() => pick({ tr, fc })}>
               <span className="th" style={{ background: window.RILLIZ_DATA.allCovers[tr.id] }}>
-                {tr.locked ? <span className="lk"><Icon.Lock size={13} /></span> : null}
+                {!canWatchTrack(tr) ? <span className="lk"><Icon.Lock size={13} /></span> : null}
               </span>
               <span className="tx">
-                <span className="t">{tr.title}</span>
+                <span className="t">{tr.displayTitle || tr.title}</span>
                 <span className="s">
                   <span className="fc">FITCLIP {fc.fitclipNumber}</span><span className="dot">·</span>
-                  <span>{tr.choreographer}</span><span className="dot">·</span>
+                  <span>{tr.choreo || tr.choreographer}</span><span className="dot">·</span>
                   <span>{tr.bpm} BPM</span><span className="dot">·</span>
                   <span>{tr.category || tr.tempoLabel}</span>
                 </span>
               </span>
-              {tr.locked
-                ? <span className="ss-need">{t.purchaseRequired}</span>
+              {!canWatchTrack(tr)
+                ? <span className="ss-need">{getTrackStatusLabel(tr, t)}</span>
                 : <span className="ss-ok">{t.available}</span>}
             </button>
           ))}
